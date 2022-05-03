@@ -1,10 +1,4 @@
 import telebot
-from telebot import types
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import numpy
-from gspread import utils
-
 from telebot import custom_filters
 from telebot.handler_backends import State, StatesGroup  # States
 
@@ -12,12 +6,12 @@ from telebot.handler_backends import State, StatesGroup  # States
 from telebot.storage import StateMemoryStorage
 from database import GoogleSheet
 from keyboards import *
+import config
 
-# sheet = googleSheet.createFirstSheet("testArcher")
-# sheetId = googleSheet.createSheetById("testArcher", 312817610)
+
 
 state_storage = StateMemoryStorage()
-bot = telebot.TeleBot('5317874926:AAHaK_cQSRpMofm83nSYSubhSUptaLSRQpQ', state_storage=state_storage)
+bot = telebot.TeleBot(config.BOT_TOKEN, state_storage=state_storage)
 
 isShowDaysMarkup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 recordExerciseButton = types.KeyboardButton("Записаться на занятие")
