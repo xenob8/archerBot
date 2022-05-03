@@ -23,7 +23,7 @@ isShowDaysMarkup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 recordExerciseButton = types.KeyboardButton("Записаться на занятие")
 isShowDaysMarkup.add(recordExerciseButton)
 
-MY_CHAT_ID = 480316781
+#MY_CHAT_ID = 317800531
 
 
 class MyStates(StatesGroup):
@@ -41,7 +41,7 @@ def start(message):
     bot.send_message(message.chat.id, "Начинаем регистрацию")
 
     bot.set_state(message.from_user.id, MyStates.name, message.chat.id)
-    bot.send_message(message.chat.id, "Введите ваше имя")
+    bot.send_message(message.chat.id, "Введите ваше имя(без фамилии)")
 
 
 @bot.message_handler(state="*", commands=['cancel'])
@@ -98,6 +98,8 @@ def showHoursHandler(call):
     dayIndex = call.data[3]
     dayString = call.data[4:]
     times, numbers = googleSheet.getTimeAndCountListsByDay(dayIndex)
+    print(times)
+    print(numbers)
 
     timesMarkup = getTimesMarkup(dayIndex, times, numbers)
 
@@ -106,33 +108,43 @@ def showHoursHandler(call):
 
     bot.edit_message_text(chat_id=call.message.chat.id,
                           message_id=call.message.message_id,
-                          text="Доступное время на " + dayString, reply_markup=timesMarkup)
+                          text="Доступное время на" + dayString, reply_markup=timesMarkup)
 
+
+@bot.callback_query_handler(func=lambda call: call.data.find("ct") != -1)
+def checkTypeHandler(call):
+    bot.edit_message_text(chat_id=call.message.chat.id,
+                          message_id=call.message.message_id,
+                          text="Выберите тип занятия\n" + call.message.text[18:], reply_markup=chooseTypeMarkup(call.data))
 
 @bot.callback_query_handler(func=lambda call: call.data.find("ex") != -1)
 def addStudentHandler(call):
     # callback_data="ex" + dayIndex + str(timeIndex) + times[timeIndex]))
-    dayIndex = call.data[2]
-    timeIndex = call.data[3]
-    timeValue = call.data[4:]
+    # callback_data="exMk__" + dayIndex + str(timeIndex) + times[timeIndex]))
+    type = call.data[2:6]
+    dayIndex = call.data[6]
+    timeIndex = call.data[7]
+    timeValue = call.data[8:]
+    print(timeIndex)
 
     bot.edit_message_text(chat_id=call.message.chat.id,
                           message_id=call.message.message_id,
                           text='Записываемся...')
 
-    address, name = googleSheet.addStudent(dayIndex, timeIndex, call.from_user.id)
+    address, name = googleSheet.addStudent(type, dayIndex, timeIndex, call.from_user.id)
 
     if address:
         bot.edit_message_text(chat_id=call.message.chat.id,
                               message_id=call.message.message_id,
-                              text='Вы записаны на ' + timeValue + " " + call.message.text[18:],
+                              text='Вы записаны на ' + timeValue + " " + call.message.text[21:],
                               reply_markup=cancelRecordMarkup(address))
 
-        bot.send_message(MY_CHAT_ID, "На занятие " + call.message.text[18:] + " в " + timeValue + " записался\n" + name)
+        #bot.send_message(MY_CHAT_ID, "На занятие " + call.message.text[18:] + " в " + timeValue + " записался\n" + name)
     else:
         bot.edit_message_text(chat_id=call.message.chat.id,
                               message_id=call.message.message_id,
-                              text='Ошибка записи, попробуйте другое время')
+                              text='Ошибка записи, попробуйте другое время\n' + name,
+                              reply_markup=getDaysKeyMarkup(googleSheet.getAvailableDays()))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.find("using") != -1)

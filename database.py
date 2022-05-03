@@ -13,7 +13,11 @@ class GoogleSheet:
     sheet = []
     sheetId = []
     MAX_TIMES = 10
-
+    types = {
+        "Mk__": "МК",
+        "Solo": "Самостоятельное",
+        "Educ": "Обучение",
+    }
 
     def createFirstSheet(self, sheetName):
         self.sheet = self.client.open(sheetName).sheet1
@@ -35,19 +39,25 @@ class GoogleSheet:
 
     def getTimeAndCountListsByDay(self, dayIndex):
         list = self.sheet.batch_get(["times" + dayIndex, "numbers" + dayIndex])
-        times = np.array(list[0]).flatten()
-        numbers = np.array(list[1]).flatten()
+        times = np.array(list[0]).flatten()[0::2]
+        numbers = np.array(list[1]).flatten()[0::2]
         return times, numbers
 
-    def addStudent(self, dayIndex, timeIndex, userId):
-        names_cells = self.sheet.range("names" + dayIndex)[int(timeIndex)::self.MAX_TIMES]
+    def addStudent(self, type, dayIndex, timeIndex, userId):
+        names_cells = self.sheet.range("names" + dayIndex)[int(timeIndex) * 2::self.MAX_TIMES]
+        print(names_cells)
+        name = self.getUserNameById(userId)
         for name_cell in names_cells:
+            if name_cell.value == name:
+                return None, "Вы уже записаны сюда"
             if not name_cell.value:
-                name = self.getUserNameById(userId)
-                self.sheet.update_acell(name_cell.address, name)
+                self.sheet.update_cells([
+                    gspread.cell.Cell(name_cell.row, name_cell.col, name),
+                    gspread.cell.Cell(name_cell.row, name_cell.col + 1, self.types[type])
+                ])
+
                 return name_cell.address, name
         return None, None
-
 
     def getUserNameById(self, id):
         idCell = self.sheetId.find(str(id))
@@ -63,4 +73,4 @@ class GoogleSheet:
             self.sheetId.append_row([userId, name, lastName])
         else:
             self.sheetId.update_cells([gspread.cell.Cell(idCell.row, idCell.col + 1, name),
-                                  gspread.cell.Cell(idCell.row, idCell.col + 2, lastName)])
+                                       gspread.cell.Cell(idCell.row, idCell.col + 2, lastName)])
