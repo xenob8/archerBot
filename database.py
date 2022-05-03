@@ -65,7 +65,11 @@ class GoogleSheet:
         return userNameCell[0].value + " " + userNameCell[1].value
 
     def deleteUser(self, cell):
-        self.sheet.update_acell(cell, "")
+        row, col = gspread.utils.a1_to_rowcol(cell)
+        self.sheet.update_cells([
+            gspread.cell.Cell(row, col, ""),
+            gspread.cell.Cell(row, col+1, ""),
+            ])
 
     def registerUser(self, name, lastName, userId):
         idCell = self.sheetId.find(str(userId))
