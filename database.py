@@ -14,9 +14,9 @@ class GoogleSheet:
     sheetId = []
     MAX_TIMES = 10
     types = {
-        "Mk__": "МК",
-        "Solo": "Самостоятельное",
-        "Educ": "Обучение",
+        "MK": "МК",
+        "solo": "Самостоятельное",
+        "educ": "Обучение",
     }
 
     def createFirstSheet(self, sheetName):
@@ -59,10 +59,28 @@ class GoogleSheet:
                 return name_cell.address, name
         return None, None
 
+
+    def getUserIdByName(self, name) -> int:
+        nameCell : gspread.Cell = self.sheetId.find(name)
+        id = self.sheetId.cell(nameCell.row, nameCell.col-1).value
+        return int(id)
+
+    def getUsersIdByTime(self, dayIndex, timeIndex) -> list:
+        names_cells = self.sheet.range("names" + dayIndex)[int(timeIndex) * 2::self.MAX_TIMES]
+        print(names_cells)
+        ids = []
+        for name_cell in names_cells:
+            name = name_cell.value
+            if not name:
+                continue
+            else:
+                ids.append(self.getUserIdByName(name))
+        return ids
+
     def getUserNameById(self, id):
         idCell = self.sheetId.find(str(id))
-        userNameCell = self.sheetId.range(idCell.row, idCell.col + 1, idCell.row, idCell.col + 2)
-        return userNameCell[0].value + " " + userNameCell[1].value
+        userNameCell = self.sheetId.range(idCell.row, idCell.col + 1)
+        return userNameCell[0].value
 
     def deleteUser(self, cell):
         row, col = gspread.utils.a1_to_rowcol(cell)
@@ -76,5 +94,4 @@ class GoogleSheet:
         if not idCell:
             self.sheetId.append_row([userId, name, lastName])
         else:
-            self.sheetId.update_cells([gspread.cell.Cell(idCell.row, idCell.col + 1, name),
-                                       gspread.cell.Cell(idCell.row, idCell.col + 2, lastName)])
+            self.sheetId.update_cells([gspread.cell.Cell(idCell.row, idCell.col + 1, name + " " + lastName)])
