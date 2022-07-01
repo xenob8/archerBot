@@ -3,6 +3,9 @@ from telebot.callback_data import CallbackData
 
 MAX_STUDENTS_PER_TIME = 5
 
+isShowDaysMarkup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+recordExerciseButton = types.KeyboardButton("Записаться на занятие")
+isShowDaysMarkup.add(recordExerciseButton)
 
 days_callback = CallbackData("dayIndex", "dayStr", prefix="days")
 times_callback = CallbackData("timeIndex","timeStr", prefix="times", sep="!")
