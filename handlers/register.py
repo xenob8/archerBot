@@ -5,6 +5,7 @@ from keyboards import isShowDaysMarkup
 bot = getBot()
 googleSheet = getSheet()
 
+
 @bot.message_handler(commands=["start"])
 def start(message):
     firstName = message.from_user.first_name

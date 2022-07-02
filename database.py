@@ -2,6 +2,7 @@ import itertools
 
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
+from gspread import Cell
 import numpy as np
 
 
@@ -25,6 +26,10 @@ class GoogleSheet:
 
     def createSheetById(self, sheetName, id):
         self.sheetId = self.client.open(sheetName).get_worksheet_by_id(id)
+        return self.sheetId
+
+    def createRecordsSheet(self, sheetName, id):
+        self.sheetRecord = self.client.open(sheetName).get_worksheet_by_id(id)
         return self.sheetId
 
     def getAvailableDays(self):
@@ -59,10 +64,9 @@ class GoogleSheet:
                 return name_cell.address, name
         return None, None
 
-
     def getUserIdByName(self, name) -> int:
-        nameCell : gspread.Cell = self.sheetId.find(name)
-        id = self.sheetId.cell(nameCell.row, nameCell.col-1).value
+        nameCell: gspread.Cell = self.sheetId.find(name)
+        id = self.sheetId.cell(nameCell.row, nameCell.col - 1).value
         return int(id)
 
     def getUsersIdByTime(self, dayIndex, timeIndex) -> list:
@@ -77,8 +81,16 @@ class GoogleSheet:
                 ids.append(self.getUserIdByName(name))
         return ids
 
+    def deleteUsersByTime(self, dayIndex, timeIndex):
+        names_cells: list[Cell] = self.sheet.range("names" + dayIndex)[int(timeIndex) * 2::self.MAX_TIMES]
+        types_cells = []
+        for cell in names_cells:
+            cell.value = ""
+            types_cells.append(Cell(cell.row, cell.col + 1, ""))
+        self.sheet.update_cells(names_cells + types_cells)
+
     def getUserNameById(self, id):
-        idCell = self.sheetId.find(str(id))
+        idCell: gspread.Cell = self.sheetId.find(str(id))
         userNameCell = self.sheetId.range(idCell.row, idCell.col + 1)
         return userNameCell[0].value
 
@@ -86,8 +98,8 @@ class GoogleSheet:
         row, col = gspread.utils.a1_to_rowcol(cell)
         self.sheet.update_cells([
             gspread.cell.Cell(row, col, ""),
-            gspread.cell.Cell(row, col+1, ""),
-            ])
+            gspread.cell.Cell(row, col + 1, ""),
+        ])
 
     def registerUser(self, name, lastName, userId):
         idCell = self.sheetId.find(str(userId))
@@ -95,3 +107,27 @@ class GoogleSheet:
             self.sheetId.append_row([userId, name, lastName])
         else:
             self.sheetId.update_cells([gspread.cell.Cell(idCell.row, idCell.col + 1, name + " " + lastName)])
+
+    def addRecord(self, userId, dayIndex, timeIndex, messageId):
+        self.sheetRecord.append_row([userId, dayIndex, timeIndex, messageId])
+
+    def deleteRecord(self, id, dayIndex, timeIndex):
+        cells: list[Cell] = self.sheetRecord.findall(str(id), in_column=1)
+        if cells:
+            row = cells[0].row
+            leng = len(cells)
+            # wtf = self.sheetRecord.range(first_row=row, first_col=1, last_row=row + leng - 1, last_col=4)
+            wtf: list[Cell] = self.sheetRecord.range(row, 2, row + leng - 1, 4)
+            dayIndexes = wtf[0::3]
+            timeIndexes = wtf[1::3]
+            messId = wtf[2::3]
+            for i, (day, time, mess) in enumerate(zip(dayIndexes, timeIndexes, messId)):
+                print(day.value, time.value)
+                if day.value == str(dayIndex) and time.value == str(timeIndex):
+                    self.sheetRecord.delete_row(row + i)
+                    return mess.value
+
+    def deleteRecordByMessageId(self, messageId):
+        messCell: Cell = self.sheetRecord.find(str(messageId), in_column=4)
+        if messCell:
+            self.sheetRecord.delete_row(messCell.row)
