@@ -1,8 +1,15 @@
 from enum import Enum, IntEnum
 
 from telebot.handler_backends import State, StatesGroup
-from gspread import cell
 
+class EditStates(StatesGroup):
+    name = State()
+    lastName = State()
+
+class RegisterStates(StatesGroup):
+    name = State()
+    lastName = State()
+    type = State()
 
 class MyStates(StatesGroup):
     name = State()
@@ -26,3 +33,7 @@ class Context(IntEnum):
     ADMIN_DAY_STRING = 7
     ADMIN_TIME_INDEX = 8
     ADMIN_TIME_STRING = 9
+
+class RegContext(IntEnum):
+    NAME = 0
+    LAST_NAME = 1

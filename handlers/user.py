@@ -1,43 +1,41 @@
 from telebot import types
 
 import constants
-from bot import getBot, getSheet
+from loader import bot, googleSheet
 from constants import RETURN_DAYS_STATE
 from keyboards import days_callback, getDaysKeyMarkup, times_callback, chooseTypeMarkup, types_activity_callback, \
     getTimesMarkup, cancelRecordMarkup, cancel_record_callback
 from states import MyStates, Context
-
-bot = getBot()
-googleSheet = getSheet()
+import utils
 
 
-@bot.message_handler(text="test", state=MyStates.days)
-def test(message: types.Message, ):
-    with bot.retrieve_data(message.from_user.id) as data:
-        print(data)
-
-    bot.set_state(message.from_user.id, None)
-
-    with bot.retrieve_data(message.from_user.id) as data:
-        print(data)
-
-        # print(data["lol"])
+#
+# @bot.message_handler(text="test", state=MyStates.days)
+# def test(message: types.Message, ):
+#     with bot.retrieve_data(message.from_user.id) as data:
+#         print(data)
+#
+#     bot.set_state(message.from_user.id, None)
+#
+#     with bot.retrieve_data(message.from_user.id) as data:
+#         print(data)
+#
+#         # print(data["lol"])
 
 
 @bot.callback_query_handler(func=days_callback.filter().check, state=MyStates.days)
 def showHoursHandler(call: types.CallbackQuery):
     callback_data: dict = days_callback.parse(call.data)
-    dayIndex = callback_data["dayIndex"]
+    dayIndex = int(callback_data["dayIndex"])
     dayString = callback_data["dayStr"]
     with bot.retrieve_data(call.from_user.id) as data:
         data: dict[int, str]
-        data[Context.DAY_INDEX] = dayIndex
+        data[Context.DAY_INDEX] = str(dayIndex)
         data[Context.DAY_STRING] = dayString
-    times, numbers = googleSheet.getTimeAndCountListsByDay(dayIndex)
-    print(times)
-    print(numbers)
+    days = utils.getAvailableDays(call.from_user.id)
+    day = days[dayIndex]
 
-    timesMarkup = getTimesMarkup(dayIndex, times, numbers)
+    timesMarkup = getTimesMarkup(day.times)
 
     timesMarkup.add(types.InlineKeyboardButton(text="Вернуться к расписанию",
                                                callback_data=RETURN_DAYS_STATE))
@@ -53,7 +51,7 @@ def showHoursHandler(call: types.CallbackQuery):
 def returnToDays(call: types.CallbackQuery):
     bot.edit_message_text(chat_id=call.message.chat.id,
                           message_id=call.message.message_id,
-                          text="Доступное время", reply_markup=getDaysKeyMarkup(googleSheet.getAvailableDays()))
+                          text="Доступное время", reply_markup=getDaysKeyMarkup(utils.getAvailableDays(call.from_user.id)))
     bot.set_state(call.from_user.id, MyStates.days)
 
 
@@ -123,7 +121,7 @@ def addStudentHandler(call: types.CallbackQuery):
         bot.edit_message_text(chat_id=call.message.chat.id,
                               message_id=call.message.message_id,
                               text='Ошибка записи, попробуйте другое время\n' + name,
-                              reply_markup=getDaysKeyMarkup(googleSheet.getAvailableDays()))
+                              reply_markup=getDaysKeyMarkup(utils.getAvailableDays(call.from_user.id)))
 
 
 @bot.message_handler(state=MyStates.kinds_of_activity)
@@ -146,6 +144,6 @@ def deleteUserHandler(call: types.CallbackQuery):
 @bot.message_handler(text="Записаться на занятие")
 def showDays(message: types.Message):
     # "Выберите день для записи":
-    days = googleSheet.getAvailableDays()
+    days = utils.getAvailableDays(message.from_user.id)
     bot.send_message(chat_id=message.chat.id, text="Выберите день для записи", reply_markup=getDaysKeyMarkup(days))
     bot.set_state(message.chat.id, MyStates.days)

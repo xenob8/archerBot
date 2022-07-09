@@ -1,24 +1,28 @@
+import builtins
 import itertools
+import re
 
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 from gspread import Cell
 import numpy as np
+from gspread.utils import ValueRenderOption, ValueInputOption
+import config
 
 
 class GoogleSheet:
-    scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
-             "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("testsheets-347919-bd50bf0daaae.json", scope)
-    client = gspread.authorize(creds)
-    sheet = []
-    sheetId = []
     MAX_TIMES = 10
     types = {
         "MK": "МК",
         "solo": "Самостоятельное",
         "educ": "Обучение",
     }
+    MAX_DAYS = 7
+    MESSAGE_ID_COL = 4
+
+    def __init__(self):
+        creds = ServiceAccountCredentials.from_json_keyfile_name("testsheets-347919-bd50bf0daaae.json", config.scope)
+        self.client = gspread.authorize(creds)
 
     def createFirstSheet(self, sheetName):
         self.sheet = self.client.open(sheetName).sheet1
@@ -32,21 +36,19 @@ class GoogleSheet:
         self.sheetRecord = self.client.open(sheetName).get_worksheet_by_id(id)
         return self.sheetId
 
-    def getAvailableDays(self):
-        list = self.sheet.batch_get(["day_0", "day_1", "day_2", "day_3", "day_4", "day_5", "day_6"])
-        days = []
-        for day in list:
-            if day:
-                days.append(day[0][0])
-            else:
-                days.append(None)
-        return days
+    def getAllDays(self):
+        dayList = []
+        timesList = []
+        numbersList = []
+        for i in range(0, self.MAX_DAYS):
+            dayList.append("day_" + str(i))
+            timesList.append("times" + str(i))
+            numbersList.append("numbers" + str(i))
 
-    def getTimeAndCountListsByDay(self, dayIndex):
-        list = self.sheet.batch_get(["times" + dayIndex, "numbers" + dayIndex])
-        times = np.array(list[0]).flatten()[0::2]
-        numbers = np.array(list[1]).flatten()[0::2]
-        return times, numbers
+        wtf = self.sheet.batch_get(dayList + timesList + numbersList)
+        dayObjList = [Day(wtf[i], wtf[i + self.MAX_DAYS], wtf[i + self.MAX_DAYS * 2]) for i in range(0, self.MAX_DAYS)]
+
+        return dayObjList
 
     def addStudent(self, type, dayIndex, timeIndex, userId):
         names_cells = self.sheet.range("names" + dayIndex)[int(timeIndex) * 2::self.MAX_TIMES]
@@ -69,8 +71,8 @@ class GoogleSheet:
         id = self.sheetId.cell(nameCell.row, nameCell.col - 1).value
         return int(id)
 
-    def getUsersIdByTime(self, dayIndex, timeIndex) -> list:
-        names_cells = self.sheet.range("names" + dayIndex)[int(timeIndex) * 2::self.MAX_TIMES]
+    def getUsersIdByTime(self, dayIndex: int, timeIndex: int) -> list:
+        names_cells = self.sheet.range("names" + str(dayIndex))[timeIndex * 2::self.MAX_TIMES]
         print(names_cells)
         ids = []
         for name_cell in names_cells:
@@ -81,8 +83,8 @@ class GoogleSheet:
                 ids.append(self.getUserIdByName(name))
         return ids
 
-    def deleteUsersByTime(self, dayIndex, timeIndex):
-        names_cells: list[Cell] = self.sheet.range("names" + dayIndex)[int(timeIndex) * 2::self.MAX_TIMES]
+    def deleteUsersByTime(self, dayIndex: int, timeIndex: int):
+        names_cells: list[Cell] = self.sheet.range("names" + str(dayIndex))[timeIndex * 2::self.MAX_TIMES]
         types_cells = []
         for cell in names_cells:
             cell.value = ""
@@ -101,33 +103,100 @@ class GoogleSheet:
             gspread.cell.Cell(row, col + 1, ""),
         ])
 
+    def isUserExist(self, id) -> bool:
+        return False if self.sheetId.find(str(id)) is None else True
+
+    def editUser(self, userId, name, lastName) -> bool:
+        idCell = self.sheetId.find(str(userId))
+        if not idCell:
+            return False
+        else:
+            self.sheetId.update_cells([gspread.cell.Cell(idCell.row, idCell.col + 1, name + " " + lastName)])
+            return True
+
     def registerUser(self, name, lastName, userId):
         idCell = self.sheetId.find(str(userId))
         if not idCell:
-            self.sheetId.append_row([userId, name, lastName])
+            self.sheetId.append_row([userId, name + " " + lastName])
         else:
             self.sheetId.update_cells([gspread.cell.Cell(idCell.row, idCell.col + 1, name + " " + lastName)])
 
     def addRecord(self, userId, dayIndex, timeIndex, messageId):
-        self.sheetRecord.append_row([userId, dayIndex, timeIndex, messageId])
+        newRowIndex = next_available_row(self.sheetRecord)
+        self.sheetRecord.append_row([userId, dayIndex, timeIndex, messageId,
+                                     f'=TEXTJOIN(" "; TRUE;A{newRowIndex} ; B{newRowIndex})',
+                                     f'=TEXTJOIN(" "; TRUE;A{newRowIndex} ; B{newRowIndex};C{newRowIndex})'],
+                                    value_input_option=ValueInputOption.user_entered)
 
-    def deleteRecord(self, id, dayIndex, timeIndex):
-        cells: list[Cell] = self.sheetRecord.findall(str(id), in_column=1)
-        if cells:
-            row = cells[0].row
-            leng = len(cells)
-            # wtf = self.sheetRecord.range(first_row=row, first_col=1, last_row=row + leng - 1, last_col=4)
-            wtf: list[Cell] = self.sheetRecord.range(row, 2, row + leng - 1, 4)
-            dayIndexes = wtf[0::3]
-            timeIndexes = wtf[1::3]
-            messId = wtf[2::3]
-            for i, (day, time, mess) in enumerate(zip(dayIndexes, timeIndexes, messId)):
-                print(day.value, time.value)
-                if day.value == str(dayIndex) and time.value == str(timeIndex):
-                    self.sheetRecord.delete_row(row + i)
-                    return mess.value
+    def deleteRecord(self, id: int, dayIndex: int, timeIndex: int) ->str:
+        cell: Cell = self.sheetRecord.find(str(id) + " " + str(dayIndex) + " " + str(timeIndex), in_column=6)
+        if cell:
+            mess = self.sheetRecord.cell(row=cell.row, col=self.MESSAGE_ID_COL).value
+            self.sheetRecord.delete_row(index=cell.row)
+            return mess
 
     def deleteRecordByMessageId(self, messageId):
         messCell: Cell = self.sheetRecord.find(str(messageId), in_column=4)
         if messCell:
             self.sheetRecord.delete_row(messCell.row)
+
+    # def findUserTimesByIdAndDay(self, userId, dayIndex):
+    #     cells = self.sheetRecord.findall(str(userId) + " " + str(dayIndex))
+    #     times = []
+    #     if cells:
+    #         for cell in cells:
+    #             times.append(self.sheetRecord.cell(cell.row, cell.col - 2).value)
+    #     return times
+
+    def getUserDaysAndTimesById(self, userId):
+        userCells: list[Cell] = self.sheetRecord.findall(re.compile(str(userId) + " \d \d"), in_column=6)
+        map: dict[int, list[int]] = {}
+        if userCells:
+            print(userCells)
+            for cell in userCells:
+                intList = list(builtins.map(int, cell.value.split(sep=" ")))
+                if map.get(intList[1]):
+                    map[intList[1]].append(intList[2])
+                else:
+                    map[intList[1]] = [intList[2]]
+        return map
+
+
+def next_available_row(worksheet):
+    str_list = list(filter(None, worksheet.col_values(1)))
+    return str(len(str_list) + 1)
+
+
+class Day:
+    MAX_USERS_PER_TIME = 5
+    dayText = []
+    times = []
+    numbers = []
+
+    def __init__(self, day, times, numbers):
+        if day:
+            self.dayText: list = day[0][0]
+            if times:
+                self.times: list = times[0][0::2]
+                self.numbers: list = numbers[0][0::2]
+
+    def __bool__(self):
+        if self.dayText:
+            return any(self.times)
+        return False
+
+    def isAdmin(self):
+        if self.dayText:
+            for time, count in zip(self.times, self.numbers):
+                if time and int(count) > 0:
+                    return True
+        return False
+
+    def getValidTimes(self):
+        for i in range(len(self.times)):
+            if self.times[i] and int(self.numbers[i]) > self.MAX_USERS_PER_TIME:
+                self.times[i] = ""
+
+    def killSelfRecords(self, timeIndexes: list):
+        for index in timeIndexes:
+            self.times[index] = ""

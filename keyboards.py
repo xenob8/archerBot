@@ -9,6 +9,8 @@ isShowDaysMarkup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 recordExerciseButton = types.KeyboardButton("Записаться на занятие")
 isShowDaysMarkup.add(recordExerciseButton)
 
+deleteCommandButton = types.KeyboardButton("Отменить занятие")
+
 days_callback = CallbackData("dayIndex", "dayStr", prefix="days")
 times_callback = CallbackData("timeIndex", "timeStr", prefix="times", sep="!")
 types_activity_callback = CallbackData("type", prefix="sport")
@@ -21,22 +23,34 @@ def getDaysKeyMarkup(days):
     for dayIndex, day in enumerate(days):
         if day:
             keys.append(
-                types.InlineKeyboardButton(text=day, callback_data=days_callback.new(dayIndex=dayIndex, dayStr=day)))
+                types.InlineKeyboardButton(text=day.dayText,
+                                           callback_data=days_callback.new(dayIndex=dayIndex, dayStr=day.dayText)))
     daysKeyMarkup.add(*keys, row_width=2)
     daysKeyMarkup.add(types.InlineKeyboardButton(text="Выйти", callback_data=constants.EXIT))
     return daysKeyMarkup
 
 
-def getTimesMarkup(dayIndex, times, numbers):
+def getAdminDaysKeyMarkup(days):
+    daysKeyMarkup = types.InlineKeyboardMarkup()
+    keys = []
+    for dayIndex, day in enumerate(days):
+        if day.isAdmin():
+            keys.append(
+                types.InlineKeyboardButton(text=day.dayText,
+                                           callback_data=days_callback.new(dayIndex=dayIndex, dayStr=day.dayText)))
+    daysKeyMarkup.add(*keys, row_width=2)
+    daysKeyMarkup.add(types.InlineKeyboardButton(text="Выйти", callback_data=constants.EXIT))
+    return daysKeyMarkup
+
+def getTimesMarkup(times):
     timesMarkup = types.InlineKeyboardMarkup()
 
-    for timeIndex in range(len(times)):
-        if not times[timeIndex]:
+    for timeIndex, time in enumerate(times):
+        if not time:
             continue
-        if int(numbers[timeIndex]) < MAX_STUDENTS_PER_TIME:
-            timesMarkup.add(types.InlineKeyboardButton(
-                text=times[timeIndex],
-                callback_data=times_callback.new(timeIndex=timeIndex, timeStr=times[timeIndex])))
+        timesMarkup.add(types.InlineKeyboardButton(
+            text=times[timeIndex],
+            callback_data=times_callback.new(timeIndex=timeIndex, timeStr=times[timeIndex])))
 
     return timesMarkup
 
@@ -44,12 +58,12 @@ def getTimesMarkup(dayIndex, times, numbers):
 def getAdminTimesMarkUp(times):
     timesMarkup = types.InlineKeyboardMarkup()
 
-    for timeIndex in range(len(times)):
-        if not times[timeIndex]:
+    for timeIndex, time in enumerate(times):
+        if not time:
             continue
         timesMarkup.add(types.InlineKeyboardButton(
-            text=times[timeIndex],
-            callback_data=times_callback.new(timeIndex=timeIndex, timeStr=times[timeIndex])))
+            text=time,
+            callback_data=times_callback.new(timeIndex=timeIndex, timeStr=time)))
 
     return timesMarkup
 
@@ -68,4 +82,10 @@ def chooseTypeMarkup():
     buttonSolo = types.InlineKeyboardButton(text="самостоятельное", callback_data=types_activity_callback.new("solo"))
     buttonEduc = types.InlineKeyboardButton(text="обучение", callback_data=types_activity_callback.new("educ"))
     markup.add(buttonMk, buttonSolo, buttonEduc)
+    return markup
+
+def adminDefaultMarkup():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(recordExerciseButton)
+    markup.add(deleteCommandButton)
     return markup
