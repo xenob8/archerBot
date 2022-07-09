@@ -55,7 +55,6 @@ def deleteWork(call: types.CallbackQuery):
 @bot.message_handler(text="Отменить занятие", chat_id=ADMINS)
 def chooseDay(message: types.Message):
     days = googleSheet.getAllDays()
-
     bot.send_message(chat_id=message.chat.id, text="Выберите день для удаления", reply_markup=getAdminDaysKeyMarkup(days))
     bot.set_state(message.chat.id, MyStates.admindays)
 

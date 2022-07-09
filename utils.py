@@ -1,3 +1,7 @@
+import datetime
+from time import sleep
+
+from database import FormattedDay
 from loader import bot, googleSheet
 from states import Context
 
@@ -33,13 +37,22 @@ def deleteRecord(dayIndex:int, timeIndex:int):
         bot.edit_message_text(text="Занятие перенесено", chat_id=id, message_id=msg)
     return ids
 
-def foo():
-    days = googleSheet.getAllDays()
-    map = googleSheet.getUserDaysAndTimesById(480316781)
-    # for key, val in map.items():
-    #     print("mapkey:", key)
-    for i, day in enumerate(days):
-        day.getValidTimes()
-        if map.get(str(i)):
-            day.killSelfRecords(map[str(i)])
+def deleteExpiredRecords():
+    oldTime = datetime.datetime(1899, 12, 30)
+    while True:
+        sleep(60)
+        now = datetime.datetime.now()
+        days: list[FormattedDay] = googleSheet.getFormattedDays()
+        for dayIndex, day in enumerate(days):
+            if day:
+                for timeIndex, time in enumerate(day.times):
+                    if time:
+                        dayTime = oldTime + datetime.timedelta(days=day.dayText + time)
+                        if now > dayTime:
+                            ids = googleSheet.getUsersIdByTime(dayIndex, timeIndex)
+                            for id in ids:
+                                msg = googleSheet.deleteRecord(id, dayIndex, timeIndex)
+                                googleSheet.deleteTime(dayIndex, timeIndex)
+                                bot.edit_message_text(text="Время занятия истекло " + str(dayTime), chat_id=id,
+                                                      message_id=msg)
 

@@ -50,6 +50,21 @@ class GoogleSheet:
 
         return dayObjList
 
+    def getFormattedDays(self) -> list:
+        dayList = []
+        timesList = []
+        for i in range(0, self.MAX_DAYS):
+            dayList.append("day_" + str(i))
+            timesList.append("times" + str(i))
+
+        wtf = self.sheet.batch_get(dayList + timesList,
+                                   value_render_option=gspread.utils.ValueRenderOption.unformatted,
+                                   date_time_render_option="SERIAL_NUMBER"
+                                   )
+        dayObjList = [FormattedDay(wtf[i], wtf[i + self.MAX_DAYS]) for i in range(0, self.MAX_DAYS)]
+
+        return dayObjList
+
     def addStudent(self, type, dayIndex, timeIndex, userId):
         names_cells = self.sheet.range("names" + dayIndex)[int(timeIndex) * 2::self.MAX_TIMES]
         print(names_cells)
@@ -128,7 +143,7 @@ class GoogleSheet:
                                      f'=TEXTJOIN(" "; TRUE;A{newRowIndex} ; B{newRowIndex};C{newRowIndex})'],
                                     value_input_option=ValueInputOption.user_entered)
 
-    def deleteRecord(self, id: int, dayIndex: int, timeIndex: int) ->str:
+    def deleteRecord(self, id: int, dayIndex: int, timeIndex: int) -> str:
         cell: Cell = self.sheetRecord.find(str(id) + " " + str(dayIndex) + " " + str(timeIndex), in_column=6)
         if cell:
             mess = self.sheetRecord.cell(row=cell.row, col=self.MESSAGE_ID_COL).value
@@ -139,6 +154,12 @@ class GoogleSheet:
         messCell: Cell = self.sheetRecord.find(str(messageId), in_column=4)
         if messCell:
             self.sheetRecord.delete_row(messCell.row)
+
+    def deleteTime(self, dayIndex, timeIndex):
+        cells = self.sheet.range("times"+str(dayIndex))
+        delCell = cells[timeIndex*2]
+        self.sheet.update_cell(delCell.row, delCell.col, "")
+
 
     # def findUserTimesByIdAndDay(self, userId, dayIndex):
     #     cells = self.sheetRecord.findall(str(userId) + " " + str(dayIndex))
@@ -175,7 +196,7 @@ class Day:
 
     def __init__(self, day, times, numbers):
         if day:
-            self.dayText: list = day[0][0]
+            self.dayText: str = day[0][0]
             if times:
                 self.times: list = times[0][0::2]
                 self.numbers: list = numbers[0][0::2]
@@ -200,3 +221,17 @@ class Day:
     def killSelfRecords(self, timeIndexes: list):
         for index in timeIndexes:
             self.times[index] = ""
+
+class FormattedDay:
+    dayText = []
+    times = []
+    def __init__(self, day, times):
+        if day:
+            self.dayText: int = day[0][0]
+            if times:
+                self.times: list[int] = times[0][0::2]
+
+    def __bool__(self):
+        if self.dayText:
+            return any(self.times)
+        return False
