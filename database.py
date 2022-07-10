@@ -1,4 +1,5 @@
 import builtins
+from datetime import datetime, timedelta
 import itertools
 import re
 
@@ -8,6 +9,42 @@ from gspread import Cell
 import numpy as np
 from gspread.utils import ValueRenderOption, ValueInputOption
 import config
+
+
+class FormattedDay:
+    begin_time = datetime(1899, 12, 30)
+    dayDate = []
+    times = {}
+    datetimes:dict[int, datetime] = {}
+
+    def __init__(self, day, times):
+        if day:
+            self.dayDate: datetime = self.begin_time + timedelta(days=day[0][0])
+            if times:
+                self.times: dict[int] = {index: value for index, value in enumerate(times[0][0::2]) if value}
+                self.datetimes = {index: self.dayDate + timedelta(days=time) for index, time
+                                  in self.times.items()}
+
+    def __bool__(self):
+        if self.dayDate:
+            return any(self.times)
+        return False
+
+    @staticmethod
+    def getMinDay(now: datetime, days):
+        day: FormattedDay
+        minDayIndex = None
+        minDate = None
+        minTimeIndex = None
+        for dayIndex, day in enumerate(days):
+            res, timeIndex = min(((date, timeIndex) for timeIndex, date in day.datetimes.items() if date > now), default=(None, None))
+            if res:
+                if not minDate or res < minDate:
+                    minDate = res
+                    minDayIndex = dayIndex
+                    minTimeIndex = timeIndex
+        return minDayIndex, minTimeIndex
+
 
 
 class GoogleSheet:
@@ -50,7 +87,7 @@ class GoogleSheet:
 
         return dayObjList
 
-    def getFormattedDays(self) -> list:
+    def getFormattedDays(self) -> list[FormattedDay]:
         dayList = []
         timesList = []
         for i in range(0, self.MAX_DAYS):
@@ -156,10 +193,9 @@ class GoogleSheet:
             self.sheetRecord.delete_row(messCell.row)
 
     def deleteTime(self, dayIndex, timeIndex):
-        cells = self.sheet.range("times"+str(dayIndex))
-        delCell = cells[timeIndex*2]
+        cells = self.sheet.range("times" + str(dayIndex))
+        delCell = cells[timeIndex * 2]
         self.sheet.update_cell(delCell.row, delCell.col, "")
-
 
     # def findUserTimesByIdAndDay(self, userId, dayIndex):
     #     cells = self.sheetRecord.findall(str(userId) + " " + str(dayIndex))
@@ -221,17 +257,3 @@ class Day:
     def killSelfRecords(self, timeIndexes: list):
         for index in timeIndexes:
             self.times[index] = ""
-
-class FormattedDay:
-    dayText = []
-    times = []
-    def __init__(self, day, times):
-        if day:
-            self.dayText: int = day[0][0]
-            if times:
-                self.times: list[int] = times[0][0::2]
-
-    def __bool__(self):
-        if self.dayText:
-            return any(self.times)
-        return False
