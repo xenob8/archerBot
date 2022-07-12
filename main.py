@@ -22,9 +22,9 @@ bot.add_custom_filter(custom_filters.ChatFilter())
 bot.add_custom_filter(filters.ChatFilterCallback())
 locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
 
-thread = Thread(target=utils.deleteExpiredRecords)
+# thread = Thread(target=utils.deleteExpiredRecords)
 
-thread.start()
+# thread.start()
 # print("dffdf")
 
 bot.polling(none_stop=True, interval=0)

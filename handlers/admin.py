@@ -3,7 +3,7 @@ from telebot import types
 import utils
 from loader import bot, googleSheet
 from constants import RETURN_DAYS_STATE, ADMINS
-from keyboards import days_callback, getAdminTimesMarkUp, times_callback, getDaysKeyMarkup, getAdminDaysKeyMarkup
+from keyboards import *
 from states import MyStates, Context
 from utils import deleteRecord
 
@@ -30,26 +30,26 @@ def showHoursHandler(call: types.CallbackQuery):
     bot.set_state(call.from_user.id, MyStates.admintimes)
 
 
-@bot.callback_query_handler(func=times_callback.filter().check, state=MyStates.admintimes, chat_id_callback=ADMINS)
-def deleteWork(call: types.CallbackQuery):
-    print("deleteWork")
-    callback: dict = times_callback.parse(call.data)
-
-    with bot.retrieve_data(call.from_user.id) as data:
-        timeIndex = int(callback["timeIndex"])
-        timeStr = callback["timeStr"]
-
-    ids = deleteRecord(data[Context.ADMIN_DAY_INDEX], timeIndex)
-
-    for id in ids:
-        bot.send_message(id, text="Внимаение, занятие " + data[
-            Context.ADMIN_DAY_STRING] + " в " + timeStr + "было отменено")
-    bot.delete_state(call.from_user.id)
-    bot.reset_data(call.from_user.id)
-    googleSheet.deleteUsersByTime(data[Context.ADMIN_DAY_INDEX], timeIndex)
-    bot.edit_message_text(chat_id=call.message.chat.id,
-                          message_id=call.message.message_id,
-                          text="Вы удалили занятие\n" + timeStr)
+# @bot.callback_query_handler(func=times_callback.filter().check, state=MyStates.admintimes, chat_id_callback=ADMINS)
+# def deleteWork(call: types.CallbackQuery):
+#     print("deleteWork")
+#     callback: dict = times_callback.parse(call.data)
+#
+#     with bot.retrieve_data(call.from_user.id) as data:
+#         timeIndex = int(callback["timeIndex"])
+#         timeStr = callback["timeStr"]
+#
+#     ids = deleteRecord(data[Context.ADMIN_DAY_INDEX], timeIndex)
+#
+#     for id in ids:
+#         bot.send_message(id, text="Внимаение, занятие " + data[
+#             Context.ADMIN_DAY_STRING] + " в " + timeStr + "было отменено")
+#     bot.delete_state(call.from_user.id)
+#     bot.reset_data(call.from_user.id)
+#     googleSheet.deleteUsersByTime(data[Context.ADMIN_DAY_INDEX], timeIndex)
+#     bot.edit_message_text(chat_id=call.message.chat.id,
+#                           message_id=call.message.message_id,
+#                           text="Вы удалили занятие\n" + timeStr)
 
 
 @bot.message_handler(text="Отменить занятие", chat_id=ADMINS)

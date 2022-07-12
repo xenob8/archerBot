@@ -9,42 +9,7 @@ from gspread import Cell
 import numpy as np
 from gspread.utils import ValueRenderOption, ValueInputOption
 import config
-
-
-class FormattedDay:
-    begin_time = datetime(1899, 12, 30)
-    dayDate = []
-    times = {}
-    datetimes:dict[int, datetime] = {}
-
-    def __init__(self, day, times):
-        if day:
-            self.dayDate: datetime = self.begin_time + timedelta(days=day[0][0])
-            if times:
-                self.times: dict[int] = {index: value for index, value in enumerate(times[0][0::2]) if value}
-                self.datetimes = {index: self.dayDate + timedelta(days=time) for index, time
-                                  in self.times.items()}
-
-    def __bool__(self):
-        if self.dayDate:
-            return any(self.times)
-        return False
-
-    @staticmethod
-    def getMinDay(now: datetime, days):
-        day: FormattedDay
-        minDayIndex = None
-        minDate = None
-        minTimeIndex = None
-        for dayIndex, day in enumerate(days):
-            res, timeIndex = min(((date, timeIndex) for timeIndex, date in day.datetimes.items() if date > now), default=(None, None))
-            if res:
-                if not minDate or res < minDate:
-                    minDate = res
-                    minDayIndex = dayIndex
-                    minTimeIndex = timeIndex
-        return minDayIndex, minTimeIndex
-
+from record import Record
 
 
 class GoogleSheet:
@@ -61,6 +26,10 @@ class GoogleSheet:
         creds = ServiceAccountCredentials.from_json_keyfile_name("testsheets-347919-bd50bf0daaae.json", config.scope)
         self.client = gspread.authorize(creds)
 
+    def addUser(self, username, cell: Cell, type):
+        self.sheet.update_cells(
+            [Cell(row=cell.row, col=cell.col, value=username), Cell(row=cell.row, col=cell.col + 1, value=type)])
+
     def createFirstSheet(self, sheetName):
         self.sheet = self.client.open(sheetName).sheet1
         return self.sheet
@@ -73,34 +42,6 @@ class GoogleSheet:
         self.sheetRecord = self.client.open(sheetName).get_worksheet_by_id(id)
         return self.sheetId
 
-    def getAllDays(self):
-        dayList = []
-        timesList = []
-        numbersList = []
-        for i in range(0, self.MAX_DAYS):
-            dayList.append("day_" + str(i))
-            timesList.append("times" + str(i))
-            numbersList.append("numbers" + str(i))
-
-        wtf = self.sheet.batch_get(dayList + timesList + numbersList)
-        dayObjList = [Day(wtf[i], wtf[i + self.MAX_DAYS], wtf[i + self.MAX_DAYS * 2]) for i in range(0, self.MAX_DAYS)]
-
-        return dayObjList
-
-    def getFormattedDays(self) -> list[FormattedDay]:
-        dayList = []
-        timesList = []
-        for i in range(0, self.MAX_DAYS):
-            dayList.append("day_" + str(i))
-            timesList.append("times" + str(i))
-
-        wtf = self.sheet.batch_get(dayList + timesList,
-                                   value_render_option=gspread.utils.ValueRenderOption.unformatted,
-                                   date_time_render_option="SERIAL_NUMBER"
-                                   )
-        dayObjList = [FormattedDay(wtf[i], wtf[i + self.MAX_DAYS]) for i in range(0, self.MAX_DAYS)]
-
-        return dayObjList
 
     def addStudent(self, type, dayIndex, timeIndex, userId):
         names_cells = self.sheet.range("names" + dayIndex)[int(timeIndex) * 2::self.MAX_TIMES]
@@ -218,42 +159,56 @@ class GoogleSheet:
                     map[intList[1]] = [intList[2]]
         return map
 
+    def getAllRecords(self) -> list[Record]:
+        table_cells: list[Cell] = self.sheet.range("A1:L70")
+        print(table_cells)
+
+        return takeDays(table_cells)
+
+
+def takeDays(cells: list[Cell]) -> list[Record]:
+    RECORD_SIZE = 6
+    DAYS_INDENT = 10
+    DAYS_IN_TABLE = 7
+    SKIP_EMPTY_COL = 2
+    def takeDay(dayIndex) -> list[Record]:
+        records = []
+        date = takeCell(cells, col=1, row=2 + dayIndex * DAYS_INDENT)
+        for timeIndex in range(0, 5):
+            recordCells = takeRange(cells,
+                                    start_col=3 + timeIndex*SKIP_EMPTY_COL,
+                                    end_col=3 + timeIndex*SKIP_EMPTY_COL,
+                                    start_row=1 + dayIndex * DAYS_INDENT,
+                                    end_row=1 + dayIndex * DAYS_INDENT + RECORD_SIZE)
+            # see google sheet to know list indexes
+            print("day record cell times:", recordCells[0])
+            record = Record(dateCell=date, timeCell=recordCells[0], countCell=recordCells[1], nameCells=recordCells[2:])
+            records.append(record)
+        return records
+
+    allRecords: list[Record] = []
+    for dayIndex in range(0, DAYS_IN_TABLE - 1):
+        dayRecords = takeDay(dayIndex)
+        allRecords.extend(dayRecords)
+
+    return allRecords
+
+
+def takeCell(cells: list[Cell], col, row) -> Cell or None:
+    for cell in cells:
+        if cell.col == col and cell.row == row:
+            return cell
+    return None
+
+
+def takeRange(cells: list[Cell], start_col, start_row, end_col, end_row):
+    result: list[Cell] = []
+    for cell in cells:
+        if start_col <= cell.col <= end_col and start_row <= cell.row <= end_row:
+            result.append(cell)
+    return result
+
 
 def next_available_row(worksheet):
     str_list = list(filter(None, worksheet.col_values(1)))
     return str(len(str_list) + 1)
-
-
-class Day:
-    MAX_USERS_PER_TIME = 5
-    dayText = []
-    times = []
-    numbers = []
-
-    def __init__(self, day, times, numbers):
-        if day:
-            self.dayText: str = day[0][0]
-            if times:
-                self.times: list = times[0][0::2]
-                self.numbers: list = numbers[0][0::2]
-
-    def __bool__(self):
-        if self.dayText:
-            return any(self.times)
-        return False
-
-    def isAdmin(self):
-        if self.dayText:
-            for time, count in zip(self.times, self.numbers):
-                if time and int(count) > 0:
-                    return True
-        return False
-
-    def getValidTimes(self):
-        for i in range(len(self.times)):
-            if self.times[i] and int(self.numbers[i]) > self.MAX_USERS_PER_TIME:
-                self.times[i] = ""
-
-    def killSelfRecords(self, timeIndexes: list):
-        for index in timeIndexes:
-            self.times[index] = ""

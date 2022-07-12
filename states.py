@@ -23,6 +23,7 @@ class MyStates(StatesGroup):
 
 
 class Context(IntEnum):
+    DATE = 10
     DAY_INDEX = 0
     DAY_STRING = 1
     TIME_INDEX = 2
