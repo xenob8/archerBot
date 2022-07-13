@@ -1,9 +1,9 @@
 import telebot
-from telebot.storage import StateMemoryStorage
+from telebot.storage import StateMemoryStorage, StateRedisStorage
 from database import GoogleSheet
 import config
 
-
+# redies = StateRedisStorage()
 
 state_storage = StateMemoryStorage()
 bot = telebot.TeleBot(config.BOT_TOKEN, state_storage=state_storage)

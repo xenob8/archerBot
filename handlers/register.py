@@ -82,8 +82,3 @@ def getLastName(message: Message):
 
     googleSheet.registerUser(data['name'], data['surname'], message.from_user.id)
     bot.delete_state(message.from_user.id, message.chat.id)
-
-#
-# @bot.message_handler(state=RegisterStates.type)
-# def getActivityType(message: Message):
-#     bot.send_message(message.chat.id, "Регистрация пройдена", reply_markup=isShowDaysMarkup)

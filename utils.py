@@ -1,80 +1,30 @@
 import datetime
+import record
 from time import sleep
 
 import constants
-from loader import bot, googleSheet
+
 from record import Record
 from states import Context
 import pause
 from datetime import datetime
 
 
-def getAvailableDays(userId):
-    now = datetime.now()
-    days = googleSheet.getAllDays()
-    formatDays = googleSheet.getFormattedDays()
-    for formatDay, day in zip(formatDays, days):
-        if formatDay:
-            if formatDay.dayDate.day < now.day:
-                day.dayText = ""
-                continue
-            for timeIndex, timeDate in formatDay.datetimes.items():
-                if timeDate < now:
-                    day.times[timeIndex] = ""
-
-    # if formatDay.
-    # for timeIndex, time in formatDay.datetimes.items()
-    #
-
-    map = googleSheet.getUserDaysAndTimesById(userId)
-
-    for i, day in enumerate(days):
-        day.getValidTimes()
-        if map.get(i):
-            day.killSelfRecords(map[i])
-
-    return days
 
 
-def getAdminTimesByDayIndex(dayIndex):
-    day = googleSheet.getAllDays()[dayIndex]
-    for i, (time, count) in enumerate(zip(day.times, day.numbers)):
-        if int(count) == 0:
-            day.times[i] = ""
-    return day
+# def deleteRecord(dayIndex: int, timeIndex: int):
+#     ids = googleSheet.getUsersIdByTime(dayIndex, timeIndex)
+#     for id in ids:
+#         print("DeleteRecprd with ", id)
+#         msg = googleSheet.deleteRecord(id, dayIndex=dayIndex, timeIndex=timeIndex)
+#         # change users message with record
+#         bot.edit_message_text(text="Занятие перенесено", chat_id=id, message_id=msg)
+#     return ids
 
 
-def deleteRecord(dayIndex: int, timeIndex: int):
-    ids = googleSheet.getUsersIdByTime(dayIndex, timeIndex)
-    for id in ids:
-        print("DeleteRecprd with ", id)
-        msg = googleSheet.deleteRecord(id, dayIndex=dayIndex, timeIndex=timeIndex)
-        # change users message with record
-        bot.edit_message_text(text="Занятие перенесено", chat_id=id, message_id=msg)
-    return ids
+def getFollowingRecord(records: list[Record], now: datetime):
+    return min((record for record in records if record.date and record.date > now), key=lambda record: record.date)
 
-
-# def deleteExpiredRecords():
-#     while True:
-#         now = datetime.now()
-#         days: list[FormattedDay] = googleSheet.getFormattedDays()
-#         dayIndex, timeIndex = FormattedDay.getMinDay(now, days)
-#         print("closest day in table:", dayIndex, timeIndex)
-#         if dayIndex != None:
-#             day = days[dayIndex]
-#             recordDate = day.datetimes[timeIndex]
-#             if (recordDate - now).seconds < 20:  # //11*60:
-#                 print("Отлично встали на паузу до", recordDate)
-#                 pause.until(recordDate)
-#                 print("Встали с паузы")
-#                 ids = googleSheet.getUsersIdByTime(dayIndex, timeIndex)
-#                 for id in ids:
-#                     msg = googleSheet.deleteRecord(id, dayIndex, timeIndex)
-#                     bot.edit_message_text(text="Время занятия истекло " + str(recordDate.strftime("%A %#d %B")),
-#                                           chat_id=id,
-#                                           message_id=msg)
-#
-#         sleep(10)
 
 
 def getAvaliableRecords(records: list[Record], userName):
@@ -113,7 +63,7 @@ def fullDateToHumanString(fullDate: datetime):
     return fullDate.strftime("%B %#d, %A в %H:%M")
 
 
-def dateStringToHuman(date: datetime):
+def dateToHumanString(date: datetime):
     return date.strftime("%B %#d, %A")
 
 
@@ -133,22 +83,10 @@ def findRecordByDate(records: list[Record], date: datetime) -> Record:
     return next((record for record in records if record.date == date), None)
 
 
-def getShowDaysHandlerRecords(userName):
-    records = googleSheet.getAllRecords()
-    records = getAvaliableRecords(records, userName)
-    records = getRecordsWithDiffDays(records)
-    return records
+def getAvalAdminRecords(records: list[Record]):
+    avalRecords = []
+    for record in records:
+        if record.date and record.getCount() > 0 and record.date > datetime.now():
+            avalRecords.append(record)
+    return avalRecords
 
-
-def getShowHoursHandlerRecords(day: datetime, userName):
-    records = googleSheet.getAllRecords()
-    records = getAvaliableRecords(records, userName)
-    records = getRecordsByDay(records, day)
-    return records
-
-
-def findCellForUser(date: datetime):
-    records = googleSheet.getAllRecords()
-    record = findRecordByDate(records, date)
-    cellForUser = record.getFreeNameCell()
-    return cellForUser

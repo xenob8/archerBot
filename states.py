@@ -23,17 +23,10 @@ class MyStates(StatesGroup):
 
 
 class Context(IntEnum):
-    DATE = 10
-    DAY_INDEX = 0
-    DAY_STRING = 1
-    TIME_INDEX = 2
-    TIME_STRING = 3
-    TYPE = 4
-    CELL = 5
-    ADMIN_DAY_INDEX = 6
-    ADMIN_DAY_STRING = 7
-    ADMIN_TIME_INDEX = 8
-    ADMIN_TIME_STRING = 9
+    RECORDS = 0
+    AUTH_DATE = 1
+    DATE = 2
+    USER_NAME = 3
 
 class RegContext(IntEnum):
     NAME = 0
